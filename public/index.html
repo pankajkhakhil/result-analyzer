@@ -251,6 +251,10 @@
 <div id="printDivisionContainer" class="container"></div>
 
 <script>
+    // Wake server on page load
+window.addEventListener("load", () => {
+  fetch("/wake").catch(() => {});
+});
 let globalData = null;
 
 // Tab Switching Logic
