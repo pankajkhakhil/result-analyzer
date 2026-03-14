@@ -251,9 +251,9 @@
 <div id="printDivisionContainer" class="container"></div>
 
 <script>
-    // Wake server on page load
-window.addEventListener("load", () => {
-  fetch("/wake").catch(() => {});
+    window.addEventListener("load", () => {
+   fetch("https://result-scraper-vfb7.onrender.com/wake")
+      .catch(()=>{});
 });
 let globalData = null;
 
