@@ -82,6 +82,9 @@ async function fetchStudent(year, exam, roll) {
     }
 }
 
+app.get("/wake", (req, res) => {
+  res.send("Server awake");
+});
 /* ===== API ROUTE & DYNAMIC SCANNER ===== */
 app.post("/analyze", async (req, res) => {
     const { year, exam, roll } = req.body;
