@@ -269,6 +269,7 @@ function switchTab(tabId, element) {
 }
 
 async function run() {
+async function run() {
     const loader = document.getElementById("loading");
     const section = document.getElementById("resultsSection");
     const printDiv = document.getElementById("printDivisionContainer");
@@ -277,15 +278,25 @@ async function run() {
     section.innerHTML = "";
     printDiv.innerHTML = "";
 
-    const payload = { year: document.getElementById("year").value, exam: document.getElementById("exam").value, roll: document.getElementById("roll").value };
+    const payload = {
+        year: document.getElementById("year").value,
+        exam: document.getElementById("exam").value,
+        roll: document.getElementById("roll").value
+    };
 
     try {
-        const res = await fetch("/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const res = await fetch("https://result-scraper-vfb7.onrender.com/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
         globalData = await res.json();
         renderResults(globalData);
         prepareDivisionPrint(globalData);
+
     } catch (e) {
-        alert("Error fetching data! Ensure server is running.");
+        alert("Error fetching data! Server may be waking up.");
     } finally {
         loader.style.display = "none";
     }
