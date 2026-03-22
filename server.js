@@ -8,7 +8,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-const URL = "http://117.239.28.178:8081/OLDRESULT/view_TR.asp";
+// --- DONO URLs ALAG ALAG DEFINE KAREIN ---
+const URL_OLD = "http://117.239.28.178:8081/OLDRESULT/view_TR.asp";
+const URL_2026 = "http://117.239.28.178:8081/OLDRESULT/view_TR.asp"; // <-- Jab 2026 ka naya link aaye, TOH BAS ISE CHANGE KARNA
 
 async function fetchStudent(year, exam, roll) {
     try {
@@ -17,7 +19,11 @@ async function fetchStudent(year, exam, roll) {
         form.append("cmb_exam", exam);
         form.append("txt_roll", roll);
 
-        const res = await axios.post(URL, form);
+        // --- DYNAMIC URL SELECTION ---
+        // Agar saal 2026 hai toh naya URL use hoga, baaki sabke liye OLD URL
+        const targetURL = (year === "2026") ? URL_2026 : URL_OLD;
+
+        const res = await axios.post(targetURL, form);
         const $ = cheerio.load(res.data);
 
         if (!$("td:contains('NAME OF CANDIDATE')").length) return null;
@@ -85,7 +91,6 @@ async function fetchStudent(year, exam, roll) {
                     }
                 }
                 
-                // Percentage directly from cell
                 const percText = thirdLangRow.find("td:contains('%')").text();
                 if (percText) {
                     percentage = percText.replace(/[^\d.]/g, ""); 
@@ -122,12 +127,11 @@ async function fetchStudent(year, exam, roll) {
                 }
             });
             
-            // 12th ke liye bhi Percentage directly html table element se uthayenge
             const percText = subjectTable.find("td:contains('%')").text();
             if (percText) {
-                percentage = percText.replace(/[^\d.]/g, ""); // '%', spaces aur characters hata kar sirf number (e.g. 75.40) bachega
+                percentage = percText.replace(/[^\d.]/g, "");
             } else {
-                percentage = ((grandTotal / 500) * 100).toFixed(2); // Fallback agar official % load na ho
+                percentage = ((grandTotal / 500) * 100).toFixed(2);
             }
         }
 
