@@ -27,7 +27,7 @@ async function fetchStudent(year, exam, roll) {
         const dataRow = headerCell.parent().next();
         const cells = dataRow.find("td");
 
-        // School Code (Column 4, index 3) - Ye hume boundary check karne me kaam aayega
+        // School Code (Column 4, index 3)
         const schoolCode = $(cells[3]).text().replace(/[\u00a0\s]+/g, '').trim();
 
         // Roll Number (Column 5, index 4)
@@ -73,7 +73,6 @@ async function fetchStudent(year, exam, roll) {
                 else resultStatus = rawResult;
             }
             
-            // Third Language aur Percentage fetch karna
             if (rows.length > 4) {
                 const thirdLangRow = $(rows[4]);
                 const tL_tds = thirdLangRow.find("td");
@@ -86,12 +85,12 @@ async function fetchStudent(year, exam, roll) {
                     }
                 }
                 
-                // Direct cell se percentage uthana jisme % ka sign hai
+                // Percentage directly from cell
                 const percText = thirdLangRow.find("td:contains('%')").text();
                 if (percText) {
-                    percentage = percText.replace(/[^\d.]/g, ""); // Sirf number aur dot (0.00) nikalega
+                    percentage = percText.replace(/[^\d.]/g, ""); 
                 } else {
-                    percentage = ((grandTotal / 600) * 100).toFixed(2); // Agar website me missing ho to backup calculation
+                    percentage = ((grandTotal / 600) * 100).toFixed(2); 
                 }
             } else {
                 percentage = ((grandTotal / 600) * 100).toFixed(2);
@@ -122,7 +121,14 @@ async function fetchStudent(year, exam, roll) {
                     }
                 }
             });
-            percentage = ((grandTotal / 500) * 100).toFixed(2);
+            
+            // 12th ke liye bhi Percentage directly html table element se uthayenge
+            const percText = subjectTable.find("td:contains('%')").text();
+            if (percText) {
+                percentage = percText.replace(/[^\d.]/g, ""); // '%', spaces aur characters hata kar sirf number (e.g. 75.40) bachega
+            } else {
+                percentage = ((grandTotal / 500) * 100).toFixed(2); // Fallback agar official % load na ho
+            }
         }
 
         return {
@@ -151,7 +157,6 @@ app.post("/analyze", async (req, res) => {
 
     if (isNaN(initialRoll)) return res.json({ students: [] });
 
-    // 1. Sabse pehle user ka diya roll number fetch karo taaki School Code mil sake
     const initialStudent = await fetchStudent(year, exam, initialRoll);
     
     if (!initialStudent) {
@@ -161,7 +166,6 @@ app.post("/analyze", async (req, res) => {
     const targetSchool = initialStudent.schoolCode;
     let students = [initialStudent];
 
-    // Helper function: Ek direction me tab tak fetch karega jab tak school na badal jaye
     async function scanDirection(startRoll, step) {
         let keepGoing = true;
         let currentStart = startRoll;
@@ -200,17 +204,14 @@ app.post("/analyze", async (req, res) => {
         return fetchedList;
     }
 
-    // 2. Backward (peeche) aur Forward (aage) ek saath scan karo
     console.log(`Scanning school ${targetSchool} dynamically...`);
     const [backwardStudents, forwardStudents] = await Promise.all([
         scanDirection(initialRoll - 1, -1),
         scanDirection(initialRoll + 1, 1)  
     ]);
 
-    // 3. Sabhi bacho ko ek list me jod do
     students = [...students, ...backwardStudents, ...forwardStudents];
 
-    // 4. Summary Prepare karo
     let summary = { total: students.length, first: 0, second: 0, third: 0, fail: 0 };
     students.forEach(s => {
         if (s.result.includes("1st")) summary.first++;
@@ -219,10 +220,8 @@ app.post("/analyze", async (req, res) => {
         else if (s.result.includes("FAIL")) summary.fail++;
     });
 
-    // 5. Top 3 Performers
     const top3 = [...students].sort((a, b) => b.total - a.total).slice(0, 3);
 
-    // 6. Main list ko Roll Number ke hisaab se Ascending order me sort karo
     students.sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
     
     res.json({ students, summary, top3 });
