@@ -47,36 +47,92 @@ async function fetchStudent(year, exam, roll) {
         let subjects = {};
         let grandTotal = 0;
         let resultStatus = "";
+        let percentage = "0.00";
 
-        rows.slice(2).each((i, row) => {
-            const cols = $(row).find("td");
-            if (cols.length >= 8) {
-                const subName = $(cols[0]).text().replace(/[\u00a0\s]+/g, ' ').trim();
-                const mark = parseInt($(cols[7]).text().replace(/[^\d]/g, ""));
-
-                if (subName && !isNaN(mark)) subjects[subName] = mark;
-
-                if (i === 0) {
-                    grandTotal = parseInt($(cols[8]).text().replace(/[^\d]/g, "")) || 0;
-                    const rawDiv = $(cols[10]).text().replace(/[\u00a0\s]+/g, ' ').trim();
-                    
-                    if (rawDiv.includes("1")) resultStatus = "1st Division";
-                    else if (rawDiv.includes("2")) resultStatus = "2nd Division";
-                    else if (rawDiv.includes("3")) resultStatus = "3rd Division";
-                    else if (rawDiv.includes("FAIL")) resultStatus = "FAIL";
-                    else resultStatus = rawDiv;
-                }
+        // ==========================================
+        // 10th CLASS (SECONDARY) SCRAPING LOGIC
+        // ==========================================
+        if (exam.includes("SEC") || exam.includes("VOC") || exam.includes("PRA")) {
+            const marksRow = $(rows[3]);
+            const tds = marksRow.find("td");
+            
+            if (tds.length >= 26) {
+                subjects["HINDI"] = parseInt($(tds[3]).text().replace(/[^\d]/g, "")) || 0;
+                subjects["ENGLISH"] = parseInt($(tds[7]).text().replace(/[^\d]/g, "")) || 0;
+                subjects["SCIENCE"] = parseInt($(tds[11]).text().replace(/[^\d]/g, "")) || 0;
+                subjects["SOC.SCIENCE"] = parseInt($(tds[15]).text().replace(/[^\d]/g, "")) || 0;
+                subjects["MATHS"] = parseInt($(tds[19]).text().replace(/[^\d]/g, "")) || 0;
+                
+                grandTotal = parseInt($(tds[24]).text().replace(/[^\d]/g, "")) || 0;
+                
+                const rawResult = $(tds[26]).text().trim().toUpperCase();
+                if (rawResult.includes("1")) resultStatus = "1st Division";
+                else if (rawResult.includes("2")) resultStatus = "2nd Division";
+                else if (rawResult.includes("3")) resultStatus = "3rd Division";
+                else if (rawResult.includes("FAIL")) resultStatus = "FAIL";
+                else resultStatus = rawResult;
             }
-        });
+            
+            // Third Language aur Percentage fetch karna
+            if (rows.length > 4) {
+                const thirdLangRow = $(rows[4]);
+                const tL_tds = thirdLangRow.find("td");
+                
+                if (tL_tds.length >= 5) {
+                    const thirdLangName = $(tL_tds[0]).text().replace(/[\u00a0\s]+/g, ' ').trim();
+                    const thirdLangMark = parseInt($(tL_tds[4]).text().replace(/[^\d]/g, ""));
+                    if (thirdLangName && !isNaN(thirdLangMark)) {
+                        subjects[thirdLangName] = thirdLangMark;
+                    }
+                }
+                
+                // Direct cell se percentage uthana jisme % ka sign hai
+                const percText = thirdLangRow.find("td:contains('%')").text();
+                if (percText) {
+                    percentage = percText.replace(/[^\d.]/g, ""); // Sirf number aur dot (0.00) nikalega
+                } else {
+                    percentage = ((grandTotal / 600) * 100).toFixed(2); // Agar website me missing ho to backup calculation
+                }
+            } else {
+                percentage = ((grandTotal / 600) * 100).toFixed(2);
+            }
+        } 
+        
+        // ==========================================
+        // 12th CLASS (SR. SECONDARY) SCRAPING LOGIC
+        // ==========================================
+        else {
+            rows.slice(2).each((i, row) => {
+                const cols = $(row).find("td");
+                if (cols.length >= 8) {
+                    const subName = $(cols[0]).text().replace(/[\u00a0\s]+/g, ' ').trim();
+                    const mark = parseInt($(cols[7]).text().replace(/[^\d]/g, ""));
+
+                    if (subName && !isNaN(mark)) subjects[subName] = mark;
+
+                    if (i === 0) {
+                        grandTotal = parseInt($(cols[8]).text().replace(/[^\d]/g, "")) || 0;
+                        const rawDiv = $(cols[10]).text().replace(/[\u00a0\s]+/g, ' ').trim().toUpperCase();
+                        
+                        if (rawDiv.includes("1")) resultStatus = "1st Division";
+                        else if (rawDiv.includes("2")) resultStatus = "2nd Division";
+                        else if (rawDiv.includes("3")) resultStatus = "3rd Division";
+                        else if (rawDiv.includes("FAIL")) resultStatus = "FAIL";
+                        else resultStatus = rawDiv;
+                    }
+                }
+            });
+            percentage = ((grandTotal / 500) * 100).toFixed(2);
+        }
 
         return {
             roll: rollNo,
-            schoolCode: schoolCode, // School code return kar rahe hain
+            schoolCode: schoolCode,
             name,
             father,
             subjects,
             total: grandTotal,
-            percentage: ((grandTotal / 500) * 100).toFixed(2),
+            percentage: percentage,
             result: resultStatus
         };
     } catch (e) {
@@ -87,6 +143,7 @@ async function fetchStudent(year, exam, roll) {
 app.get("/wake", (req, res) => {
   res.send("Server awake");
 });
+
 /* ===== API ROUTE & DYNAMIC SCANNER ===== */
 app.post("/analyze", async (req, res) => {
     const { year, exam, roll } = req.body;
@@ -109,7 +166,7 @@ app.post("/analyze", async (req, res) => {
         let keepGoing = true;
         let currentStart = startRoll;
         let fetchedList = [];
-        const batchSize = 15; // Ek sath 15 bacho ka data
+        const batchSize = 15; 
 
         while (keepGoing) {
             let batchRolls = [];
@@ -125,18 +182,15 @@ app.post("/analyze", async (req, res) => {
             for (let s of batchResults) {
                 if (s) {
                     foundInBatch = true;
-                    // Agar school code same hai tabhi list me dalo
                     if (s.schoolCode === targetSchool) {
                         fetchedList.push(s);
                     } else {
-                        // Agar dusra school shuru ho gaya, to is direction me aage nahi badhna
                         hitOtherSchool = true;
                         break; 
                     }
                 }
             }
 
-            // Agar pura batch khali aaya ya doosra school mil gaya, to loop rok do
             if (hitOtherSchool || !foundInBatch) {
                 keepGoing = false;
             } else {
@@ -149,8 +203,8 @@ app.post("/analyze", async (req, res) => {
     // 2. Backward (peeche) aur Forward (aage) ek saath scan karo
     console.log(`Scanning school ${targetSchool} dynamically...`);
     const [backwardStudents, forwardStudents] = await Promise.all([
-        scanDirection(initialRoll - 1, -1), // Peeche scan karega: -1, -2, -3...
-        scanDirection(initialRoll + 1, 1)   // Aage scan karega: +1, +2, +3...
+        scanDirection(initialRoll - 1, -1),
+        scanDirection(initialRoll + 1, 1)  
     ]);
 
     // 3. Sabhi bacho ko ek list me jod do
@@ -165,10 +219,10 @@ app.post("/analyze", async (req, res) => {
         else if (s.result.includes("FAIL")) summary.fail++;
     });
 
-    // 5. Top 3 Performers (Total Marks descending)
+    // 5. Top 3 Performers
     const top3 = [...students].sort((a, b) => b.total - a.total).slice(0, 3);
 
-    // 6. Main list ko Roll Number ke hisaab se Ascending order me sort karo (1, 2, 3...)
+    // 6. Main list ko Roll Number ke hisaab se Ascending order me sort karo
     students.sort((a, b) => parseInt(a.roll) - parseInt(b.roll));
     
     res.json({ students, summary, top3 });
